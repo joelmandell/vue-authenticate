@@ -48,7 +48,7 @@ export default {
     const tokenHeader = $auth.options.tokenHeader;
 
     $auth.$http.interceptors.request.use((config) => {
-      if ($auth.isAuthenticated()) {
+      if ($auth.isAuthenticated) {
         config.headers[tokenHeader] = [
           $auth.options.tokenType, $auth.getToken()
         ].join(' ')

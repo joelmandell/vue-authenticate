@@ -1,6 +1,8 @@
 import './utils.js'
 import Promise from './promise.js'
 import VueAuthenticate from './authenticate.js'
+import Vue from 'vue'
+import LocalStorage from './storage/local-storage.js'
 
 /**
  * VueAuthenticate plugin
@@ -13,6 +15,7 @@ function plugin(Vue, options) {
   }
   plugin.installed = true
 
+
   let vueAuthInstance = null;
   Object.defineProperties(Vue.prototype, {
     $auth: {
@@ -22,13 +25,15 @@ function plugin(Vue, options) {
           if (!this.$http) {
             throw new Error('Request handler instance not found')
           }
-
+       
           vueAuthInstance = new VueAuthenticate(this.$http, options)
         }
+        vueAuthInstance.isAuthenticated
         return vueAuthInstance
       }
     }
   })
+
 }
 
 /**

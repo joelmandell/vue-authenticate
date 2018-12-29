@@ -1,3 +1,4 @@
+import Vue from 'vue'
 import Promise from './promise.js'
 import { objectExtend, isString, isObject, isFunction, joinUrl, decodeBase64 } from './utils.js'
 import defaultOptions from './options.js'
@@ -5,11 +6,51 @@ import StorageFactory from './storage.js'
 import OAuth1 from './oauth/oauth1.js'
 import OAuth2 from './oauth/oauth2.js'
 
-export default class VueAuthenticate {
+const isAuthFunc = function(instance) {
+  let token = instance.storage.getItem(instance.tokenName)
+
+  if (token) {  // Token is present
+    if (token.split('.').length === 3) {  // Token with a valid JWT format XXX.YYY.ZZZ
+      try { // Could be a valid JWT or an access token with the same format
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace('-', '+').replace('_', '/');
+        const exp = JSON.parse(window.atob(base64)).exp;
+        if (typeof exp === 'number') {  // JWT with an optonal expiration claims
+          return Math.round(new Date().getTime() / 1000) < exp;
+        }
+      } catch (e) {
+        instance.isAuthed = true
+        return true;  // Pass: Non-JWT token that looks like JWT
+      }
+    }
+    instance.isAuthed = true
+    return true;  // Pass: All other tokens
+  }
+  instance.isAuthed = false
+  return false
+}
+
+export default class VueAuthenticate extends Vue { 
+  
   constructor($http, overrideOptions) {
+
     let options = objectExtend({}, defaultOptions)
     options = objectExtend(options, overrideOptions)
     let storage = StorageFactory(options)
+
+    super({
+      data() {
+        return {
+          isAuthed:this.isAuthenticated
+        }
+      },
+      computed: {
+        isAuthenticated: function() 
+        {
+         return isAuthFunc(this)
+        }
+      }
+    })
 
     Object.defineProperties(this, {
       $http: {
@@ -55,26 +96,26 @@ export default class VueAuthenticate {
    * @copyright Method taken from https://github.com/sahat/satellizer
    * @return {Boolean}
    */
-  isAuthenticated() {
-    let token = this.storage.getItem(this.tokenName)
+  // get isAuthenticated() {
+  //   let token = this.storage.getItem(this.tokenName)
 
-    if (token) {  // Token is present
-      if (token.split('.').length === 3) {  // Token with a valid JWT format XXX.YYY.ZZZ
-        try { // Could be a valid JWT or an access token with the same format
-          const base64Url = token.split('.')[1];
-          const base64 = base64Url.replace('-', '+').replace('_', '/');
-          const exp = JSON.parse(window.atob(base64)).exp;
-          if (typeof exp === 'number') {  // JWT with an optonal expiration claims
-            return Math.round(new Date().getTime() / 1000) < exp;
-          }
-        } catch (e) {
-          return true;  // Pass: Non-JWT token that looks like JWT
-        }
-      }
-      return true;  // Pass: All other tokens
-    }
-    return false
-  }
+  //   if (token) {  // Token is present
+  //     if (token.split('.').length === 3) {  // Token with a valid JWT format XXX.YYY.ZZZ
+  //       try { // Could be a valid JWT or an access token with the same format
+  //         const base64Url = token.split('.')[1];
+  //         const base64 = base64Url.replace('-', '+').replace('_', '/');
+  //         const exp = JSON.parse(window.atob(base64)).exp;
+  //         if (typeof exp === 'number') {  // JWT with an optonal expiration claims
+  //           return Math.round(new Date().getTime() / 1000) < exp;
+  //         }
+  //       } catch (e) {
+  //         return true;  // Pass: Non-JWT token that looks like JWT
+  //       }
+  //     }
+  //     return true;  // Pass: All other tokens
+  //   }
+  //   return false
+  // }
 
   /**
    * Get token if user is authenticated
@@ -102,11 +143,13 @@ export default class VueAuthenticate {
       }
     }
 
+
     if (!token && response) {
       token = response[this.options.tokenName]
     }
 
     if (token) {
+      this.isAuthed = true
       this.storage.setItem(this.tokenName, token)
     }
   }
@@ -167,11 +210,13 @@ export default class VueAuthenticate {
    * @return {Promise}                Request promise
    */
   logout(requestOptions) {
-    if (!this.isAuthenticated()) {
+    if (!this.isAuthenticated) {
       return Promise.reject(new Error('There is no currently authenticated user'))
     }
 
     requestOptions = requestOptions || {}
+
+    this.isAuthed = false
 
     if (requestOptions.url) {
       requestOptions.url = requestOptions.url ? requestOptions.url : joinUrl(this.options.baseUrl, this.options.logoutUrl)
@@ -219,7 +264,7 @@ export default class VueAuthenticate {
       return providerInstance.init(userData).then((response) => {
         this.setToken(response)
 
-        if (this.isAuthenticated()) {
+        if (this.isAuthenticated) {
           return resolve(response)
         } else {
           return reject(new Error('Authentication failed'))

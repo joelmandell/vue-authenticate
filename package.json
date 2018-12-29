@@ -75,5 +75,8 @@
     "oauth",
     "oauth 1.0",
     "oauth 2.0"
-  ]
+  ],
+  "dependencies": {
+    "vue": "^2.5.21"
+  }
 }
